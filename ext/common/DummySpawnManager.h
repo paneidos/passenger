@@ -102,6 +102,7 @@ public:
 		return 0;
 	}
 };
+typedef shared_ptr<DummySpawnManager> DummySpawnManagerPtr;
 
 } // namespace Passenger
 

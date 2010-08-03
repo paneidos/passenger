@@ -51,11 +51,130 @@
 #ifdef __cplusplus
 	#include <set>
 	#include <string>
+	#include <map>
 
 	namespace Passenger {
 	
 		using namespace std;
 		
+        
+        
+        
+        /**
+         * Server-wide (global, not per-virtual host) configuration information.
+         *
+         * Use the getter methods to query information, because those will return
+         * the default value if the value is not specified.
+         */
+        struct ServerConfig {
+            /** The filename of the Ruby interpreter to use. */
+            const char *ruby;
+            
+            /** The Passenger root folder. */
+            const char *root;
+            
+            /** The log verbosity. */
+            unsigned int logLevel;
+            
+            /** The maximum number of simultaneously alive application
+             * instances. */
+            unsigned int maxPoolSize;
+            
+            /** Whether the maxPoolSize option was explicitly specified in
+             * this server config. */
+            bool maxPoolSizeSpecified;
+            
+            /** The maximum number of simultaneously alive Rails application
+             * that a single Rails application may occupy. */
+            unsigned int maxInstancesPerApp;
+            
+            /** Whether the maxInstancesPerApp option was explicitly specified in
+             * this server config. */
+            bool maxInstancesPerAppSpecified;
+            
+            /** The maximum number of seconds that an application may be
+             * idle before it gets terminated. */
+            unsigned int poolIdleTime;
+            
+            /** Whether the poolIdleTime option was explicitly specified in
+             * this server config. */
+            bool poolIdleTimeSpecified;
+            
+            /** Whether user switching support is enabled. */
+            bool userSwitching;
+            
+            /** Whether the userSwitching option was explicitly specified in
+             * this server config. */
+            bool userSwitchingSpecified;
+
+            /** The user that applications must run as if user switching
+             * fails or is disabled. NULL means the option is not specified.
+             */
+            const char *defaultUser;
+            
+            /** The temp directory that Passenger should use. NULL
+             * means unspecified.
+             */
+            const char *tempDir;
+            
+            std::map<std::string,std::string> rubyInterpreters;
+            
+            const char *getRuby() const {
+                if (ruby != NULL) {
+                    return ruby;
+                } else {
+                    return "ruby";
+                }
+            }
+            
+            int hasRubyInterpreter(const char* arg) {
+                std::map<std::string,std::string>::iterator rubyInterpreterIterator;
+                int res = 0;
+                for( rubyInterpreterIterator = rubyInterpreters.begin(); rubyInterpreterIterator != rubyInterpreters.end(); rubyInterpreterIterator++)
+                {
+                    if(rubyInterpreterIterator->first.compare(arg)==0) res = 1;
+                    if(rubyInterpreterIterator->second.compare(arg)==0) res = 1;
+                }
+                return res;
+            }
+            const char* getRubyInterpreter(const char* arg) {
+                std::map<std::string,std::string>::iterator rubyInterpreterIterator;
+                for( rubyInterpreterIterator = rubyInterpreters.begin(); rubyInterpreterIterator != rubyInterpreters.end(); rubyInterpreterIterator++)
+                {
+                    if(rubyInterpreterIterator->first.compare(arg)==0) return rubyInterpreterIterator->second.c_str();
+                    if(rubyInterpreterIterator->second.compare(arg)==0) return rubyInterpreterIterator->second.c_str();
+                }
+                return NULL;
+            }
+            
+            int numRubyInterpreters() {
+                std::map<std::string,std::string>::iterator rubyInterpreterIterator;
+                int num = 1;
+                for( rubyInterpreterIterator = rubyInterpreters.begin(); rubyInterpreterIterator != rubyInterpreters.end(); rubyInterpreterIterator++)
+                {
+                    if(ruby != NULL && rubyInterpreterIterator->second.compare(ruby)==0) num--;
+                    num++;
+                }
+                return num;
+            }
+            
+            const char *getDefaultUser() const {
+                if (defaultUser != NULL) {
+                    return defaultUser;
+                } else {
+                    return "nobody";
+                }
+            }
+            
+            const char *getTempDir() const {
+                if (tempDir != NULL) {
+                    return tempDir;
+                } else {
+                    return getSystemTempDir();
+                }
+            }
+        };
+        
 		/**
 		 * Per-directory configuration information.
 		 *
@@ -70,6 +189,8 @@
 			
 			std::set<std::string> railsBaseURIs;
 			std::set<std::string> rackBaseURIs;
+            
+            const char* rubyInterpreter;
 			
 			/** Whether to autodetect Rails applications. */
 			Threeway autoDetectRails;
@@ -279,6 +400,19 @@
 					return "";
 				}
 			}
+			const char *getRubyInterpreter(ServerConfig *sconfig) {
+                if (rubyInterpreter != NULL) {
+                    if(!sconfig->hasRubyInterpreter(rubyInterpreter))
+                    {
+                        return sconfig->getRuby();
+                    }
+                    return sconfig->getRubyInterpreter(rubyInterpreter);
+                }
+                else
+                {
+                    return sconfig->getRuby();
+                }
+            }
 			
 			string getUploadBufferDir() const {
 				if (uploadBufferDir != NULL) {
@@ -290,88 +424,7 @@
 			
 			/*************************************/
 		};
-		
-		/**
-		 * Server-wide (global, not per-virtual host) configuration information.
-		 *
-		 * Use the getter methods to query information, because those will return
-		 * the default value if the value is not specified.
-		 */
-		struct ServerConfig {
-			/** The filename of the Ruby interpreter to use. */
-			const char *ruby;
-			
-			/** The Passenger root folder. */
-			const char *root;
-			
-			/** The log verbosity. */
-			unsigned int logLevel;
-			
-			/** The maximum number of simultaneously alive application
-			 * instances. */
-			unsigned int maxPoolSize;
-			
-			/** Whether the maxPoolSize option was explicitly specified in
-			 * this server config. */
-			bool maxPoolSizeSpecified;
-			
-			/** The maximum number of simultaneously alive Rails application
-			 * that a single Rails application may occupy. */
-			unsigned int maxInstancesPerApp;
-			
-			/** Whether the maxInstancesPerApp option was explicitly specified in
-			 * this server config. */
-			bool maxInstancesPerAppSpecified;
-			
-			/** The maximum number of seconds that an application may be
-			 * idle before it gets terminated. */
-			unsigned int poolIdleTime;
-			
-			/** Whether the poolIdleTime option was explicitly specified in
-			 * this server config. */
-			bool poolIdleTimeSpecified;
-			
-			/** Whether user switching support is enabled. */
-			bool userSwitching;
-			
-			/** Whether the userSwitching option was explicitly specified in
-			 * this server config. */
-			bool userSwitchingSpecified;
-
-			/** The user that applications must run as if user switching
-			 * fails or is disabled. NULL means the option is not specified.
-			 */
-			const char *defaultUser;
-			
-			/** The temp directory that Passenger should use. NULL
-			 * means unspecified.
-			 */
-			const char *tempDir;
-			
-			const char *getRuby() const {
-				if (ruby != NULL) {
-					return ruby;
-				} else {
-					return "ruby";
-				}
-			}
-			
-			const char *getDefaultUser() const {
-				if (defaultUser != NULL) {
-					return defaultUser;
-				} else {
-					return "nobody";
-				}
-			}
-			
-			const char *getTempDir() const {
-				if (tempDir != NULL) {
-					return tempDir;
-				} else {
-					return getSystemTempDir();
-				}
-			}
-		};
+        
 	}
 
 	extern "C" {

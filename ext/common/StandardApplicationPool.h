@@ -239,8 +239,10 @@ private:
 
 	#ifdef PASSENGER_USE_DUMMY_SPAWN_MANAGER
 		DummySpawnManager spawnManager;
+        map<string,DummySpawnManagerPtr> spawnManagers;
 	#else
 		SpawnManager spawnManager;
+        map<string,SpawnManagerPtr> spawnManagers;
 	#endif
 	SharedDataPtr data;
 	oxt::thread *cleanerThread;
@@ -262,7 +264,27 @@ private:
 	unsigned int &maxPerApp;
 	AppContainerList &inactiveApps;
 	map<string, unsigned int> &appInstanceCount;
+    
+    string _spawnCommand;
+    string _logFile;
+    string _user;
 	
+    
+    SpawnManager* ensureSpawnManager(const string rubyCommand)
+    {
+        if(spawnManagers.find(rubyCommand)==spawnManagers.end())
+        {
+            // FIXME: This is not very pretty, but should be tested again.
+            _logFile = "/dev/null";
+            #ifndef PASSENGER_USE_DUMMY_SPAWN_MANAGER
+                spawnManagers[rubyCommand]=ptr(new SpawnManager(_spawnCommand, _logFile, rubyCommand, _user));
+            #else
+                spawnManagers[rubyCommand]=ptr(new DummySpawnManagerPtr());
+            #endif
+        }
+        return spawnManagers[rubyCommand].get();
+    }
+    
 	/**
 	 * Verify that all the invariants are correct.
 	 */
@@ -461,7 +483,8 @@ private:
 					domains.erase(appRoot);
 				}
 				P_DEBUG("Restarting " << appRoot);
-				spawnManager.reload(appRoot);
+                ensureSpawnManager(options.rubyInterpreter)->reload(appRoot);
+				//spawnManager.reload(appRoot); REPLACED
 				it = domains.end();
 				activeOrMaxChanged.notify_all();
 			}
@@ -508,7 +531,8 @@ private:
 					{
 						this_thread::restore_interruption ri(di);
 						this_thread::restore_syscall_interruption rsi(dsi);
-						container->app = spawnManager.spawn(options);
+                        container->app = ensureSpawnManager(options.rubyInterpreter)->spawn(options);
+						//container->app = spawnManager.spawn(options); //REPLACED
 					}
 					container->sessions = 0;
 					instances->push_back(container);
@@ -543,7 +567,8 @@ private:
 				{
 					this_thread::restore_interruption ri(di);
 					this_thread::restore_syscall_interruption rsi(dsi);
-					container->app = spawnManager.spawn(options);
+                    container->app = ensureSpawnManager(options.rubyInterpreter)->spawn(options);
+					//container->app = spawnManager.spawn(options); //REPLACED
 				}
 				container->sessions = 0;
 				it = domains.find(appRoot);
@@ -625,6 +650,9 @@ public:
 		appInstanceCount(data->appInstanceCount)
 	{
 		TRACE_POINT();
+        _spawnCommand = spawnServerCommand;
+        _logFile = logFile;
+        _user = user;
 		detached = false;
 		done = false;
 		max = DEFAULT_MAX_POOL_SIZE;
@@ -754,7 +782,7 @@ public:
 	}
 	
 	virtual pid_t getSpawnServerPid() const {
-		return spawnManager.getServerPid();
+		return spawnManagers.begin()->second.get()->getServerPid();
 	}
 	
 	/**

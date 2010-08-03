@@ -79,6 +79,11 @@ struct PoolOptions {
 	 * empty string.
 	 */
 	string environment;
+    
+    /**
+     * The Ruby interpreter to be used. May be an empty string?
+     */
+    string rubyInterpreter;
 	
 	/**
 	 * The spawn method to use. Either "smart" or "conservative". See the Ruby
@@ -185,6 +190,7 @@ struct PoolOptions {
 		appSpawnerTimeout       = -1;
 		maxRequests    = 0;
 		memoryLimit    = 0;
+        rubyInterpreter = "default";
 		useGlobalQueue = false;
 		statThrottleRate        = 0;
 		baseURI        = "/";
@@ -206,7 +212,8 @@ struct PoolOptions {
 		bool useGlobalQueue          = false,
 		unsigned long statThrottleRate = 0,
 		const string &restartDir  = "",
-		const string &baseURI     = "/"
+		const string &baseURI     = "/",
+		const string &rubyInterpreter = "default"
 	) {
 		this->appRoot        = appRoot;
 		this->lowerPrivilege = lowerPrivilege;
@@ -222,6 +229,7 @@ struct PoolOptions {
 		this->statThrottleRate        = statThrottleRate;
 		this->restartDir     = restartDir;
 		this->baseURI        = baseURI;
+        this->rubyInterpreter = rubyInterpreter;
 	}
 	
 	/**
@@ -258,8 +266,9 @@ struct PoolOptions {
 		statThrottleRate = atol(vec[startIndex + 23]);
 		restartDir     = vec[startIndex + 25];
 		baseURI        = vec[startIndex + 27];
-		if (vec.size() > startIndex + 29) {
-			environmentVariables = ptr(new SimpleStringListCreator(vec[startIndex + 29]));
+        rubyInterpreter= vec[startIndex+ 29];
+		if (vec.size() > startIndex + 31) {
+			environmentVariables = ptr(new SimpleStringListCreator(vec[startIndex + 31]));
 		}
 	}
 	
@@ -290,6 +299,7 @@ struct PoolOptions {
 		appendKeyValue3(vec, "stat_throttle_rate", statThrottleRate);
 		appendKeyValue (vec, "restart_dir",     restartDir);
 		appendKeyValue (vec, "base_uri",        baseURI);
+        appendKeyValue (vec, "ruby_interpreter", rubyInterpreter);
 		if (storeEnvVars) {
 			vec.push_back("environment_variables");
 			vec.push_back(serializeEnvironmentVariables());

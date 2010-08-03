@@ -555,8 +555,11 @@ private:
 					config->usingGlobalQueue(),
 					config->getStatThrottleRate(),
 					config->getRestartDir(),
-					mapper.getBaseURI()
+					mapper.getBaseURI(),
+                    config->getRubyInterpreter(sconfig)
 				);
+                
+                
 				options.environmentVariables = ptr(new EnvironmentVariablesStringListCreator(r));
 				
 				session = getApplicationPool()->get(options);

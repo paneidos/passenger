@@ -187,6 +187,8 @@ describe "Apache 2 module" do
 	describe "configuration options" do
 		before :all do
 			@apache2 << "PassengerMaxPoolSize 3"
+            @apache2 << "PassengerRubyAlt ruby1 #{CONFIG['ruby_interpreter_1']}"
+            @apache2 << "PassengerRubyAlt ruby2 #{CONFIG['ruby_interpreter_2']}"
 			
 			@mycook = setup_rails_stub('mycook', File.expand_path("tmp.mycook"))
 			@mycook_url_root = "http://1.passenger.test:#{@apache2.port}"
@@ -201,6 +203,7 @@ describe "Apache 2 module" do
 			@foobar_url_root = "http://3.passenger.test:#{@apache2.port}"
 			@apache2.set_vhost('3.passenger.test', "#{@foobar.app_root}/public") do |vhost|
 				vhost << "RailsEnv development"
+                vhost << "PassengerSelectRuby ruby2"
 				vhost << "RailsSpawnMethod conservative"
 				vhost << "PassengerUseGlobalQueue on"
 				vhost << "PassengerRestartDir #{@foobar.app_root}/public"
@@ -210,6 +213,7 @@ describe "Apache 2 module" do
 			@mycook2_url_root = "http://4.passenger.test:#{@apache2.port}"
 			@apache2.set_vhost('4.passenger.test', "#{@mycook2.app_root}/sites/some.site/public") do |vhost|
 				vhost << "PassengerAppRoot #{@mycook2.app_root}"
+                vhost << "PassengerSelectRuby ruby1"
 			end
 			
 			@apache2.start
@@ -236,6 +240,14 @@ describe "Apache 2 module" do
 			@server = @mycook_url_root
 			get('/').should =~ /MyCook/
 		end
+        
+        specify "PassengerSelectRuby is per virtual host" do
+            @server = @mycook2_url_root
+            get('/welcome/ruby_interpreter').should == CONFIG['ruby_interpreter_1']
+            
+            @server = @foobar_url_root
+            get('/foo/ruby_interpreter').should == CONFIG['ruby_interpreter_2']
+        end
 		
 		specify "RailsEnv is per-virtual host" do
 			@server = @mycook_url_root

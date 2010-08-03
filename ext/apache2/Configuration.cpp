@@ -100,6 +100,7 @@ passenger_config_create_dir(apr_pool_t *p, char *dirspec) {
 	config->statThrottleRateSpecified = false;
 	config->restartDir = NULL;
 	config->uploadBufferDir = NULL;
+    config->rubyInterpreter = NULL;
 	/*************************************/
 	return config;
 }
@@ -126,6 +127,7 @@ passenger_config_merge_dir(apr_pool_t *p, void *basev, void *addv) {
 	config->autoDetectWSGI = (add->autoDetectWSGI == DirConfig::UNSET) ? base->autoDetectWSGI : add->autoDetectWSGI;
 	config->allowModRewrite = (add->allowModRewrite == DirConfig::UNSET) ? base->allowModRewrite : add->allowModRewrite;
 	config->railsEnv = (add->railsEnv == NULL) ? base->railsEnv : add->railsEnv;
+    config->rubyInterpreter = (add->rubyInterpreter == NULL) ? base->rubyInterpreter : add->rubyInterpreter;
 	config->appRoot = (add->appRoot == NULL) ? base->appRoot : add->appRoot;
 	config->rackEnv = (add->rackEnv == NULL) ? base->rackEnv : add->rackEnv;
 	config->spawnMethod = (add->spawnMethod == DirConfig::SM_UNSET) ? base->spawnMethod : add->spawnMethod;
@@ -171,7 +173,14 @@ passenger_config_merge_server(apr_pool_t *p, void *basev, void *addv) {
 	ServerConfig *config = create_server_config_struct(p);
 	ServerConfig *base = (ServerConfig *) basev;
 	ServerConfig *add = (ServerConfig *) addv;
-	
+    std::map<std::string,std::string>::iterator it;
+    
+    
+    config->rubyInterpreters = base->rubyInterpreters;
+    for (it = add->rubyInterpreters.begin(); it != add->rubyInterpreters.end(); it++) {
+        config->rubyInterpreters[it->first] = it->second;
+    }
+
 	config->ruby = (add->ruby == NULL) ? base->ruby : add->ruby;
 	config->root = (add->root == NULL) ? base->root : add->root;
 	config->logLevel = (add->logLevel) ? base->logLevel : add->logLevel;
@@ -192,9 +201,12 @@ void
 passenger_config_merge_all_servers(apr_pool_t *pool, server_rec *main_server) {
 	ServerConfig *final = (ServerConfig *) passenger_config_create_server(pool, main_server);
 	server_rec *s;
-	
 	for (s = main_server; s != NULL; s = s->next) {
 		ServerConfig *config = (ServerConfig *) ap_get_module_config(s->module_config, &passenger_module);
+        
+        for (map<string,string>::const_iterator it(config->rubyInterpreters.begin()); it != config->rubyInterpreters.end(); it++) {
+            final->rubyInterpreters[it->first] = it->second;
+        }
 		final->ruby = (final->ruby != NULL) ? final->ruby : config->ruby;
 		final->root = (final->root != NULL) ? final->root : config->root;
 		final->logLevel = (final->logLevel != 0) ? final->logLevel : config->logLevel;
@@ -244,6 +256,18 @@ cmd_passenger_log_level(cmd_parms *cmd, void *pcfg, const char *arg) {
 		config->logLevel = (unsigned int) result;
 		return NULL;
 	}
+}
+
+static const char *
+cmd_passenger_ruby_alt(cmd_parms *cmd, void *pcfg, const char *arg1, const char *arg2) {
+    ServerConfig *config = (ServerConfig *) ap_get_module_config(
+        cmd->server->module_config, &passenger_module);
+    if(strncmp("default",arg1,8)==0)
+    {
+        return "Invalid name ('default') for Ruby interpreter.";
+    }
+    config->rubyInterpreters[arg1] = arg2;
+    return NULL;
 }
 
 static const char *
@@ -402,7 +426,17 @@ cmd_passenger_stat_throttle_rate(cmd_parms *cmd, void *pcfg, const char *arg) {
 		return NULL;
 	}
 }
-
+static const char *
+cmd_passenger_select_ruby(cmd_parms *cmd, void *pcfg, const char *arg) {
+    DirConfig *config = (DirConfig *) pcfg;
+    if(strncmp("default",arg,8)==0)
+    {
+        config->rubyInterpreter = NULL;
+        return NULL;
+    }
+    config->rubyInterpreter = arg;
+    return NULL;
+}
 static const char *
 cmd_passenger_restart_dir(cmd_parms *cmd, void *pcfg, const char *arg) {
 	DirConfig *config = (DirConfig *) pcfg;
@@ -590,6 +624,7 @@ cmd_rails_spawn_server(cmd_parms *cmd, void *pcfg, const char *arg) {
 
 
 typedef const char * (*Take1Func)();
+typedef const char * (*Take2Func)();
 typedef const char * (*FlagFunc)();
 
 const command_rec passenger_commands[] = {
@@ -609,6 +644,11 @@ const command_rec passenger_commands[] = {
 		NULL,
 		RSRC_CONF,
 		"The Ruby interpreter to use."),
+    AP_INIT_TAKE2("PassengerRubyAlt",
+        (Take2Func) cmd_passenger_ruby_alt,
+        NULL,
+        RSRC_CONF,
+        "The Ruby interpreters to allow."),
 	AP_INIT_TAKE1("PassengerMaxPoolSize",
 		(Take1Func) cmd_passenger_max_pool_size,
 		NULL,
@@ -669,6 +709,11 @@ const command_rec passenger_commands[] = {
 		NULL,
 		OR_OPTIONS | ACCESS_CONF | RSRC_CONF,
 		"The directory in which Passenger should look for restart.txt."),
+    AP_INIT_TAKE1("PassengerSelectRuby",
+        (Take1Func) cmd_passenger_select_ruby,
+        NULL,
+        OR_OPTIONS | ACCESS_CONF | RSRC_CONF,
+        "The Ruby interpreter that Passenger should use."),
 	AP_INIT_TAKE1("PassengerAppRoot",
 		(Take1Func) cmd_passenger_app_root,
 		NULL,

@@ -24,6 +24,10 @@ class WelcomeController < ApplicationController
 	def rails_env
 		render :text => RAILS_ENV
 	end
+    
+    def ruby_interpreter
+        render :text => File.readlink("/proc/#{Process.pid}/exe")
+    end
 	
 	def backtrace
 		render :text => caller.join("\n")
