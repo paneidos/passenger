@@ -3,6 +3,56 @@
 Phusion Passenger probably requires no introduction. We kindly refer the reader
 to http://www.modrails.com/ for general information.
 
+== Changes from Phusion Passenger ==
+
+=== Defining other ruby versions ===
+
+In your server config specify the following as many times as you like:
+PassengerRubyAlt name executable
+
+name = A name for this interpreter, to be used later as a shortcut.
+executable = The full path to the ruby executable you want to register.
+
+=== Choosing a ruby version ===
+
+Specify the following in your <VirtualHost>, .htaccess, <Location>, <Directory>:
+PassengerSelectRuby ruby
+
+ruby = The short name given in the PassengerRubyAlt directive OR
+        The full path to one of the ruby executables specified in
+        PassengerRuby or PassengerRubyAlt directives OR
+        "default" for the default ruby executable.
+If the chosen ruby is not registered in the server configuration,
+the default ruby executable is used.
+
+=== Example ===
+
+httpd.conf:
+PassengerRuby /usr/bin/rubyee18
+PassengerRubyAlt rubyee18 /usr/bin/rubyee18
+PassengerRubyAlt ruby18 /usr/bin/ruby18
+PassengerRubyAlt ruby19 /usr/bin/ruby19
+PassengerRubyAlt new /usr/bin/ruby19
+
+The last two directives don't cause Passenger to load /usr/bin/ruby19 twice,
+instead it just registers two short names.
+The same applies to the first two lines.
+
+virtualhost:
+<VirtualHost *:80>
+    ServerName test.passenger.rubyee18
+    PassengerSelectRuby /usr/bin/rubyee18
+</VirtualHost>
+
+.htaccess:
+PassengerSelectRuby ruby19
+
+=== Limitations ===
+
+* There is no directive yet to allow non-specified ruby executables.
+* The will be no SpawnManager active until the first rails application is loaded.
+* nginx is not supported yet.
+
 == Installation
 
 === Regular installation
